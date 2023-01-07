@@ -2,8 +2,9 @@ import "@logseq/libs";
 
 import React from "react";
 import * as ReactDOM from "react-dom/client";
-import App from "./App";
+import App from "./app";
 import "./index.css";
+import { format } from "date-fns";
 
 import { logseq as PL } from "../package.json";
 
@@ -11,6 +12,61 @@ import { logseq as PL } from "../package.json";
 const css = (t, ...args) => String.raw(t, ...args);
 
 const pluginId = PL.id;
+
+type Item = {
+  title: string;
+  id: string;
+  sourceUrl: string;
+  createdAt: string;
+  thumbnailUrl: string;
+};
+
+const getTextForItem = (item: Item) => {
+  let text = `${item.title}\n`;
+
+  if (item.thumbnailUrl && item.thumbnailUrl.length > 0) {
+    text += `![${item.title}](${item.thumbnailUrl})\n`;
+  }
+
+  text += `codex-id:: ${item.id}\nurl:: ${item.sourceUrl}\n`;
+
+  return text + "\n";
+};
+
+async function getCurrentDate() {
+  return logseq.App.getUserConfigs().then((configs) => {
+    return format(new Date(), configs.preferredDateFormat);
+  });
+}
+
+async function formatDate(date: string) {
+  return logseq.App.getUserConfigs().then((configs) => {
+    return format(new Date(date), configs.preferredDateFormat);
+  });
+}
+
+const sync = async () => {
+  const res = await fetch("http://localhost:8000/graphql", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: ` {myItems { id title sourceUrl createdAt thumbnailUrl }}`,
+    }),
+  }).then((res) => res.json());
+
+  console.log(res.data.myItems);
+
+  const itemsToSync = res.data.myItems;
+
+  itemsToSync.forEach(async (item: Item) => {
+    logseq.Editor.appendBlockInPage(
+      await formatDate(item.createdAt),
+      getTextForItem(item)
+    );
+  });
+};
 
 function main() {
   console.info(`#${pluginId}: MAIN`);
@@ -21,6 +77,10 @@ function main() {
       <App />
     </React.StrictMode>
   );
+
+  logseq.Editor.registerSlashCommand("📖 sync", async () => {
+    sync();
+  });
 
   function createModel() {
     return {
