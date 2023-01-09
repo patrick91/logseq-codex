@@ -33,12 +33,6 @@ const getTextForItem = (item: Item) => {
   return text + "\n";
 };
 
-async function getCurrentDate() {
-  return logseq.App.getUserConfigs().then((configs) => {
-    return format(new Date(), configs.preferredDateFormat);
-  });
-}
-
 async function formatDate(date: string) {
   return logseq.App.getUserConfigs().then((configs) => {
     return format(new Date(date), configs.preferredDateFormat);
@@ -52,13 +46,15 @@ const sync = async () => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      query: ` {myItems { id title sourceUrl createdAt thumbnailUrl }}`,
+      query: ` {myItems(first: 1000) { id title sourceUrl createdAt thumbnailUrl }}`,
     }),
   }).then((res) => res.json());
 
   const itemsToSync = res.data.myItems;
 
   for (const item of itemsToSync) {
+    console.groupCollapsed("📚 syncing item", item.title);
+
     const pageName = await formatDate(item.createdAt);
     console.log("📚 syncing item", pageName);
 
@@ -75,21 +71,17 @@ const sync = async () => {
       const blocks = await logseq.Editor.getPageBlocksTree(pageName);
 
       // find block that starts with Codex
-      parentBlock = blocks.find((block) => {
-        block.content.startsWith("Codex");
-      });
+      parentBlock = blocks.find((b) => b.content.startsWith("Codex"));
 
-      console.log(
-        "📚 has parentBlock?",
-        parentBlock,
-        blocks.filter((block) => {
-          block.content.startsWith("Codex");
-        })
-      );
+      console.log("📚 has parentBlock?", parentBlock);
       console.log(
         "📚",
         blocks.map((b) => b.content),
-        blocks.map((b) => b.content.startsWith("Codex"))
+        blocks.map((b) => b.content.startsWith("Codex")),
+        blocks.find((b) => b.content.startsWith("Codex")),
+        blocks.filter((b) => {
+          b.content.startsWith("Codex");
+        })
       );
     } else {
       await logseq.Editor.createPage(
@@ -116,6 +108,8 @@ const sync = async () => {
     }
 
     console.log("📚", pageName, "synced");
+
+    console.groupEnd();
   }
 };
 
