@@ -28,7 +28,7 @@ const getTextForItem = (item: Item) => {
     text += `![${item.title}](${item.thumbnailUrl})\n`;
   }
 
-  text += `codex-id:: ${item.id}\nurl:: ${item.sourceUrl}\n`;
+  text += `id:: ${item.id}\nurl:: ${item.sourceUrl}\n`;
 
   return text + "\n";
 };
@@ -56,15 +56,52 @@ const sync = async () => {
     }),
   }).then((res) => res.json());
 
-  console.log(res.data.myItems);
-
   const itemsToSync = res.data.myItems;
 
   itemsToSync.forEach(async (item: Item) => {
-    logseq.Editor.appendBlockInPage(
-      await formatDate(item.createdAt),
-      getTextForItem(item)
-    );
+    const pageName = await formatDate(item.createdAt);
+
+    const page = await logseq.Editor.getPage(pageName);
+
+    let parentBlock = null;
+
+    if (page !== null) {
+      if (await logseq.Editor.getBlock(item.id)) {
+        console.info(`#${pluginId}: block already exists`);
+        return;
+      }
+
+      const blocks = await logseq.Editor.getPageBlocksTree(pageName);
+
+      // find block that starts with Codex
+      parentBlock = blocks.find((block) => {
+        block.content.startsWith("Codex");
+      });
+
+      console.log("has parentBlock?", parentBlock);
+      console.log(blocks);
+    } else {
+      await logseq.Editor.createPage(
+        pageName,
+        {},
+        {
+          createFirstBlock: false,
+          journal: true,
+        }
+      );
+    }
+
+    if (!parentBlock) {
+      parentBlock = await logseq.Editor.appendBlockInPage(pageName, "Codex");
+
+      console.log(parentBlock);
+    }
+
+    if (!parentBlock) {
+      console.error("block is null");
+    } else {
+      await logseq.Editor.insertBlock(parentBlock.uuid, getTextForItem(item));
+    }
   });
 };
 
