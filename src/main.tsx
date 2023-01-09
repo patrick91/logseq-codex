@@ -58,8 +58,9 @@ const sync = async () => {
 
   const itemsToSync = res.data.myItems;
 
-  itemsToSync.forEach(async (item: Item) => {
+  for (const item of itemsToSync) {
     const pageName = await formatDate(item.createdAt);
+    console.log("📚 syncing item", pageName);
 
     const page = await logseq.Editor.getPage(pageName);
 
@@ -78,8 +79,18 @@ const sync = async () => {
         block.content.startsWith("Codex");
       });
 
-      console.log("has parentBlock?", parentBlock);
-      console.log(blocks);
+      console.log(
+        "📚 has parentBlock?",
+        parentBlock,
+        blocks.filter((block) => {
+          block.content.startsWith("Codex");
+        })
+      );
+      console.log(
+        "📚",
+        blocks.map((b) => b.content),
+        blocks.map((b) => b.content.startsWith("Codex"))
+      );
     } else {
       await logseq.Editor.createPage(
         pageName,
@@ -87,6 +98,7 @@ const sync = async () => {
         {
           createFirstBlock: false,
           journal: true,
+          redirect: false,
         }
       );
     }
@@ -94,7 +106,7 @@ const sync = async () => {
     if (!parentBlock) {
       parentBlock = await logseq.Editor.appendBlockInPage(pageName, "Codex");
 
-      console.log(parentBlock);
+      console.log("📚", pageName, "doesn't have parent block, creating one");
     }
 
     if (!parentBlock) {
@@ -102,7 +114,9 @@ const sync = async () => {
     } else {
       await logseq.Editor.insertBlock(parentBlock.uuid, getTextForItem(item));
     }
-  });
+
+    console.log("📚", pageName, "synced");
+  }
 };
 
 function main() {
