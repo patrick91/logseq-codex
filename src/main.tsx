@@ -19,16 +19,19 @@ type Item = {
   sourceUrl: string;
   createdAt: string;
   thumbnailUrl: string;
+} & {
+  __typename: "RedditItem";
+  subreddit: string;
 };
 
 const getTextForItem = (item: Item) => {
   let text = `${item.title}\n`;
 
-  if (item.thumbnailUrl && item.thumbnailUrl.length > 0) {
-    text += `![${item.title}](${item.thumbnailUrl})\n`;
-  }
-
   text += `id:: ${item.id}\nurl:: ${item.sourceUrl}\n`;
+
+  if (item.__typename === "RedditItem") {
+    text += `subreddit:: #${item.subreddit}\n`;
+  }
 
   return text + "\n";
 };
@@ -39,6 +42,24 @@ async function formatDate(date: string) {
   });
 }
 
+const QUERY = `
+query FetchMyItems {
+  myItems(first: 1000) {
+    __typename
+
+    id
+    title
+    sourceUrl
+    createdAt
+    thumbnailUrl
+
+    ... on RedditItem {
+      subreddit
+    }
+  }
+}
+`;
+
 const sync = async () => {
   const res = await fetch("http://localhost:8000/graphql", {
     method: "POST",
@@ -46,7 +67,7 @@ const sync = async () => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      query: ` {myItems(first: 10) { id title sourceUrl createdAt thumbnailUrl }}`,
+      query: QUERY,
     }),
   }).then((res) => res.json());
 
@@ -108,7 +129,19 @@ const sync = async () => {
     if (!parentBlock) {
       console.error("block is null");
     } else {
-      await logseq.Editor.insertBlock(parentBlock.uuid, getTextForItem(item));
+      const itemBlock = await logseq.Editor.insertBlock(
+        parentBlock.uuid,
+        getTextForItem(item)
+      );
+
+      if (itemBlock && item.thumbnailUrl) {
+        logseq.Editor.setBlockCollapsed(itemBlock.uuid, true);
+
+        await logseq.Editor.insertBlock(
+          itemBlock.uuid,
+          `![](${item.thumbnailUrl})`
+        );
+      }
     }
 
     console.log("📚", pageName, "synced");
