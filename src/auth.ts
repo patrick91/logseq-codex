@@ -1,7 +1,10 @@
+const CLIENT_ID = "logseq";
+const GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
+
 const startAuthorization = async () => {
   const params = new URLSearchParams();
-  params.append("client_id", "patrick");
-  params.append("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
+  params.append("client_id", CLIENT_ID);
+  params.append("grant_type", GRANT_TYPE);
 
   const url = `http://localhost:8000/device_authorization?${params.toString()}`;
 
@@ -24,8 +27,8 @@ const startAuthorization = async () => {
 
 const fetchToken = async (deviceCode: string) => {
   const params = new URLSearchParams();
-  params.append("client_id", "patrick");
-  params.append("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
+  params.append("client_id", CLIENT_ID);
+  params.append("grant_type", GRANT_TYPE);
   params.append("device_code", deviceCode);
 
   const url = `http://localhost:8000/token?${params.toString()}`;
@@ -41,15 +44,25 @@ const fetchToken = async (deviceCode: string) => {
 };
 
 export const login = async () => {
-  const authorization = await startAuthorization();
+  await logseq.Editor.insertAtEditingCursor("Contacting the server...");
+  const block = await logseq.Editor.getCurrentBlock();
 
-  // create a block saying "Please go to this URL and enter this code"
-  // and then open the URL in a new tab
-  //
+  let authorization: Awaited<ReturnType<typeof startAuthorization>>;
+
+  try {
+    authorization = await startAuthorization();
+  } catch (e) {
+    await logseq.Editor.updateBlock(
+      block!.uuid,
+      "Failed to contact the server, please try again later"
+    );
+
+    return;
+  }
+
   const text = `Please go to ${authorization.verificationUri} and enter the code ${authorization.userCode}`;
 
-  await logseq.Editor.insertAtEditingCursor(text);
-  const block = await logseq.Editor.getCurrentBlock();
+  await logseq.Editor.updateBlock(block!.uuid, text);
 
   window.open(authorization.verificationUriComplete, "_blank");
 
