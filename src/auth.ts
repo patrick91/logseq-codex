@@ -64,12 +64,12 @@ export const login = async () => {
   const token = getToken();
 
   if (token) {
-    await logseq.Editor.insertAtEditingCursor("Already logged in...");
+    await logseq.UI.showMsg("Already logged in");
 
     return;
   }
 
-  await logseq.Editor.insertAtEditingCursor("Contacting the server...");
+  await logseq.Editor.insertAtEditingCursor("📚 Connecting to the server...");
   const block = await logseq.Editor.getCurrentBlock();
 
   let authorization: Awaited<ReturnType<typeof startAuthorization>>;
@@ -77,15 +77,16 @@ export const login = async () => {
   try {
     authorization = await startAuthorization();
   } catch (e) {
-    await logseq.Editor.updateBlock(
-      block!.uuid,
+    await logseq.UI.showMsg(
       "Failed to contact the server, please try again later"
     );
+
+    await logseq.Editor.removeBlock(block!.uuid);
 
     return;
   }
 
-  const text = `Please go to ${authorization.verificationUri} and enter the code ${authorization.userCode}`;
+  const text = "📚 Waiting for authorization...";
 
   await logseq.Editor.updateBlock(block!.uuid, text);
 
@@ -97,17 +98,16 @@ export const login = async () => {
     if (token.error) {
       await logseq.Editor.updateBlock(
         block!.uuid,
-        "Still waiting for you to authorize this app"
+        "📚 Still waiting for you to authorize this app"
       );
 
       return;
     }
 
     if (token.access_token) {
-      await logseq.Editor.updateBlock(
-        block!.uuid,
-        "You have successfully authorized this app 🔥"
-      );
+      await logseq.UI.showMsg("You have successfully authorized this app 🔥");
+
+      await logseq.Editor.removeBlock(block!.uuid);
 
       setToken(token);
     }
