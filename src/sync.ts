@@ -1,5 +1,7 @@
 import { formatDate } from "./utils/date";
 
+import { getToken } from "./auth";
+
 const QUERY = `
 query FetchMyItems {
   myItems(first: 1000) {
@@ -42,25 +44,46 @@ const getTextForItem = (item: Item) => {
 };
 
 export const sync = async () => {
+  const token = getToken();
+
+  if (!token) {
+    await logseq.UI.showMsg("You are not authenticated. Please log in.");
+
+    return;
+  }
+
+  // TODO: store last sync item id in local storage
   const res = await fetch("http://localhost:8000/graphql", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token?.access_token}`,
     },
     body: JSON.stringify({
       query: QUERY,
     }),
   }).then((res) => res.json());
 
+  if (res.errors) {
+    let message = "Something went wrong while syncing. Please try again later.";
+
+    if (res.errors[0].message === "You are not authenticated") {
+      message = "You are not authenticated. Please log in.";
+    }
+
+    await logseq.UI.showMsg(message, "error");
+
+    return;
+  }
+
+  await logseq.UI.showMsg("Sync started", "info");
+
   const itemsToSync = res.data.myItems;
 
   for (const item of itemsToSync) {
     const pageName = await formatDate(item.createdAt);
 
-    // this needs sync
     if (await logseq.Editor.getBlock(item.id)) {
-      console.info(`📚 ${item.id} exists`);
-
       continue;
     }
 
@@ -98,9 +121,6 @@ export const sync = async () => {
       );
     }
 
-    console.groupCollapsed("📚 syncing item", item.id);
-    console.log("📚 syncing item", pageName);
-
     if (!parentBlock) {
       parentBlock = await logseq.Editor.appendBlockInPage(pageName, "Codex");
 
@@ -124,9 +144,7 @@ export const sync = async () => {
         );
       }
     }
-
-    console.log("📚", pageName, "synced");
-
-    console.groupEnd();
   }
+
+  await logseq.UI.showMsg("Sync finished", "success");
 };
