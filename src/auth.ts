@@ -81,7 +81,7 @@ export const login = async () => {
     if (token.access_token) {
       await logseq.Editor.updateBlock(
         block!.uuid,
-        "You have successfully authorized this app 🔥"
+        "You have successfully authorized this app 🔥 " + token.access_token
       );
     }
 
